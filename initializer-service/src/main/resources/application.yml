@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: initializer-service
+
+server:
+  port: 8083
+
+
+eureka:
+  instance:
+    hostname: localhost
+    port: 8081
+  client:
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:${eureka.instance.port}/eureka/
+    fetch-registry: true
+
+logging:
+  level.com.github.bilak: DEBUG
+
+
+AUTHORIZATION_SERVER_URL: http://uaa-service/uaa
+security:
+  basic:
+    enabled: false
+  oauth2:
+    client:
+      accessTokenUri: ${AUTHORIZATION_SERVER_URL}/oauth/token
+      userAuthorizationUri: ${AUTHORIZATION_SERVER_URL}/oauth/authorize
+      client-id: demo
+      client-secret: demo
+      scope: read, write
+    resource:
+      token-info-uri: ${AUTHORIZATION_SERVER_URL}/oauth/check_token
+      user-info-uri: ${AUTHORIZATION_SERVER_URL}/user
