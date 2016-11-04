@@ -2,6 +2,7 @@ package com.github.bilak.cloud.configuration;
 
 import com.github.bilak.cloud.oauth2.PocPrincipalExtractor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.PrincipalExtractor;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.ResourceServerProperties;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.UserInfoTokenServices;
@@ -16,11 +17,14 @@ import org.springframework.security.oauth2.client.OAuth2RestTemplate;
 import org.springframework.security.oauth2.client.resource.OAuth2ProtectedResourceDetails;
 import org.springframework.security.oauth2.client.token.AccessTokenRequest;
 import org.springframework.security.oauth2.client.token.DefaultAccessTokenRequest;
+import org.springframework.security.oauth2.client.token.grant.client.ClientCredentialsAccessTokenProvider;
 import org.springframework.security.oauth2.client.token.grant.client.ClientCredentialsResourceDetails;
 import org.springframework.security.oauth2.client.token.grant.code.AuthorizationCodeResourceDetails;
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configurers.ResourceServerSecurityConfigurer;
+import org.springframework.web.client.RestOperations;
+import org.springframework.web.client.RestTemplate;
 
 /**
  * Created by lvasek on 28/10/2016.
@@ -35,10 +39,17 @@ public class SecurityConfiguration {
 
 	@Bean(name = LOAD_BALANCED_TEMPLATE)
 	@LoadBalanced
-	OAuth2RestOperations balancedRestTemplate() {
+	RestTemplate balancedRestTemplate() {
 		AccessTokenRequest atr = new DefaultAccessTokenRequest();
 		OAuth2RestTemplate template = new OAuth2RestTemplate(clientResourceDetails(), new DefaultOAuth2ClientContext(atr));
+		template.setAccessTokenProvider(new CloudClientCredentialsAccessTokenProvider(testTemplate()));
 		return template;
+	}
+
+	@LoadBalanced
+	@Bean
+	RestTemplate testTemplate() {
+		return new RestTemplate();
 	}
 
 	private OAuth2ProtectedResourceDetails clientResourceDetails() {
@@ -58,7 +69,8 @@ public class SecurityConfiguration {
 		private OAuth2RestOperations restOperations;
 
 		@Autowired
-		public ResourceServerConfiguration(ResourceServerProperties ssoProperties, OAuth2RestOperations restOperations) {
+		public ResourceServerConfiguration(ResourceServerProperties ssoProperties,
+				@Qualifier(value = SecurityConfiguration.LOAD_BALANCED_TEMPLATE) OAuth2RestOperations restOperations) {
 			this.ssoProperties = ssoProperties;
 			this.restOperations = restOperations;
 		}
@@ -89,6 +101,21 @@ public class SecurityConfiguration {
 		public void configure(HttpSecurity http) throws Exception {
 			http.authorizeRequests().anyRequest().authenticated();
 		}
+	}
+
+	public static class CloudClientCredentialsAccessTokenProvider extends ClientCredentialsAccessTokenProvider {
+		private RestOperations restOperations;
+
+		public CloudClientCredentialsAccessTokenProvider(RestOperations restOperations) {
+			this.restOperations = restOperations;
+		}
+
+		@Override
+		protected RestOperations getRestTemplate() {
+			setMessageConverters(new RestTemplate().getMessageConverters());
+			return this.restOperations;
+		}
+
 	}
 
 }
